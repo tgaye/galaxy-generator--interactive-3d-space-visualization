@@ -1,0 +1,444 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy Generator | Interactive 3D Space Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dat.gui@0.7.7/build/dat.gui.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            color: #e0e0ff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        header {
+            padding: 2rem;
+            text-align: center;
+            background: rgba(10, 10, 30, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(100, 100, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #8a8aff, #ff8aff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            margin-bottom: 1rem;
+        }
+
+        .main-content {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: rgba(20, 20, 50, 0.5);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .controls-section {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 300px;
+            background: rgba(30, 30, 70, 0.5);
+            padding: 1.5rem;
+            border-radius: 10px;
+            border: 1px solid rgba(100, 100, 255, 0.2);
+        }
+
+        .control-group h2 {
+            margin-bottom: 1rem;
+            color: #8a8aff;
+            font-size: 1.3rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4a4aff 0%, #8a4aff 100%);
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(74, 74, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 74, 255, 0.4);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #4a4a7a 0%, #8a4a7a 100%);
+        }
+
+        .info-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(30, 30, 70, 0.5);
+            border-radius: 10px;
+            border: 1px solid rgba(100, 100, 255, 0.2);
+        }
+
+        .info-section h2 {
+            margin-bottom: 1rem;
+            color: #8a8aff;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            margin-top: 2rem;
+            background: rgba(10, 10, 30, 0.7);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(100, 100, 255, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .controls-section {
+                flex-direction: column;
+            }
+            
+            .control-group {
+                min-width: 100%;
+            }
+        }
+
+        /* GUI Override */
+        .dg.ac {
+            z-index: 1000 !important;
+        }
+    </style>
+
+<base target="_self">
+
+
+    </head><body><div id="canvas-container"></div>
+
+    <header>
+        <h1>Galaxy Generator</h1>
+        <p class="subtitle">Create and explore custom 3D galaxies in real-time</p>
+    </header>
+
+    <div class="main-content">
+        <div class="controls-section">
+            <div class="control-group">
+                <h2>Structure</h2>
+                <div id="gui-container"></div>
+            </div>
+            <div class="control-group">
+                <h2>Actions</h2>
+                <div class="button-group">
+                    <button id="big-bang-btn">Big Bang Animation</button>
+                    <button id="reset-btn" class="secondary">Reset Galaxy</button>
+                </div>
+                <div class="button-group">
+                    <button id="random-btn">Randomize</button>
+                    <button id="screenshot-btn">Take Screenshot</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h2>About This Project</h2>
+            <p>This interactive galaxy generator uses Three.js to create parameterized 3D galaxies in your browser. Adjust the settings to create spiral galaxies, elliptical galaxies, or completely unique cosmic structures. Watch as your galaxy forms through the Big Bang animation or rotate it to explore from different angles.</p>
+            <p>All rendering is done in real-time using WebGL. For best performance on mobile devices, reduce the star count.</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 Cosmic Creations | Interactive 3D Visualization Tool</p>
+    </footer>
+
+    <script>
+        // Three.js Galaxy Generator
+        let scene, camera, renderer, galaxy, gui;
+        let params = {
+            starCount: 5000,
+            spiralArms: 4,
+            armTightness: 1.5,
+            armWidth: 0.5,
+            coreSize: 0.3,
+            coreDensity: 2.0,
+            diskSize: 1.0,
+            starSize: 0.5,
+            coreColor: '#ff8a4a',
+            armColor: '#8a8aff',
+            rotationSpeed: 0.2,
+            bigBangDuration: 3.0,
+            showNebulae: true,
+            starInteraction: true
+        };
+
+        // Initialize Three.js scene
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a1a);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // GUI setup
+            setupGUI();
+
+            // Create initial galaxy
+            createGalaxy();
+
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('big-bang-btn').addEventListener('click', triggerBigBang);
+            document.getElementById('reset-btn').addEventListener('click', resetGalaxy);
+            document.getElementById('random-btn').addEventListener('click', randomizeGalaxy);
+            document.getElementById('screenshot-btn').addEventListener('click', takeScreenshot);
+
+            // Start animation loop
+            animate();
+        }
+
+        // Create galaxy based on current parameters
+        function createGalaxy() {
+            if (galaxy) {
+                scene.remove(galaxy);
+                if (galaxy.geometry) galaxy.geometry.dispose();
+                if (galaxy.material) galaxy.material.dispose();
+            }
+
+            const particlesGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(params.starCount * 3);
+            const colors = new Float32Array(params.starCount * 3);
+            const sizes = new Float32Array(params.starCount);
+
+            const coreColor = new THREE.Color(params.coreColor);
+            const armColor = new THREE.Color(params.armColor);
+
+            for (let i = 0; i < params.starCount; i++) {
+                // Position stars in spiral pattern
+                const arm = Math.floor(i / (params.starCount / params.spiralArms)) % params.spiralArms;
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.pow(Math.random(), params.coreDensity) * params.diskSize;
+                const armAngle = angle + (arm * Math.PI * 2 / params.spiralArms) + radius * params.armTightness;
+                
+                const x = Math.cos(armAngle) * radius * (1 + Math.random() * params.armWidth);
+                const y = Math.sin(armAngle) * radius * (1 + Math.random() * params.armWidth);
+                const z = (Math.random() - 0.5) * 0.2 * params.diskSize;
+
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = z;
+
+                // Color gradient from core to arms
+                const distanceFromCenter = Math.sqrt(x * x + y * y + z * z) / params.diskSize;
+                const starColor = coreColor.clone().lerp(armColor, distanceFromCenter / params.coreSize);
+                
+                colors[i * 3] = starColor.r;
+                colors[i * 3 + 1] = starColor.g;
+                colors[i * 3 + 2] = starColor.b;
+
+                sizes[i] = params.starSize * (1 + Math.random() * 0.5);
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particlesGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: params.starSize,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            galaxy = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(galaxy);
+        }
+
+        // Setup dat.GUI controls
+        function setupGUI() {
+            gui = new dat.GUI({ autoPlace: false });
+            document.getElementById('gui-container').appendChild(gui.domElement);
+
+            const structure = gui.addFolder('Structure');
+            structure.add(params, 'starCount', 1000, 20000, 100).name('Star Count').onChange(createGalaxy);
+            structure.add(params, 'spiralArms', 1, 8, 1).name('Spiral Arms').onChange(createGalaxy);
+            structure.add(params, 'armTightness', 0.5, 3, 0.1).name('Arm Tightness').onChange(createGalaxy);
+            structure.add(params, 'armWidth', 0.1, 1, 0.1).name('Arm Width').onChange(createGalaxy);
+            structure.add(params, 'coreSize', 0.1, 1, 0.1).name('Core Size').onChange(createGalaxy);
+            structure.add(params, 'coreDensity', 0.5, 3, 0.1).name('Core Density').onChange(createGalaxy);
+            structure.add(params, 'diskSize', 0.5, 2, 0.1).name('Disk Size').onChange(createGalaxy);
+            structure.add(params, 'starSize', 0.1, 2, 0.1).name('Star Size').onChange(createGalaxy);
+
+            const appearance = gui.addFolder('Appearance');
+            appearance.addColor(params, 'coreColor').name('Core Color').onChange(createGalaxy);
+            appearance.addColor(params, 'armColor').name('Arm Color').onChange(createGalaxy);
+
+            const animation = gui.addFolder('Animation');
+            animation.add(params, 'rotationSpeed', 0, 1, 0.05).name('Rotation Speed');
+            animation.add(params, 'bigBangDuration', 1, 5, 0.5).name('Big Bang Duration');
+
+            const features = gui.addFolder('Features');
+            features.add(params, 'showNebulae').name('Show Nebulae');
+            features.add(params, 'starInteraction').name('Star Interaction');
+
+            structure.open();
+            appearance.open();
+            animation.open();
+        }
+
+        // Trigger Big Bang animation
+        function triggerBigBang() {
+            if (!galaxy) return;
+
+            const originalPositions = galaxy.geometry.attributes.position.array.slice();
+            const targetPositions = galaxy.geometry.attributes.position.array;
+
+            // Set all stars to center
+            for (let i = 0; i < targetPositions.length; i++) {
+                targetPositions[i] = 0;
+            }
+            galaxy.geometry.attributes.position.needsUpdate = true;
+
+            // Animate to final positions
+            const startTime = Date.now();
+            const duration = params.bigBangDuration * 1000;
+
+            function animateBigBang() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                for (let i = 0; i < targetPositions.length; i++) {
+                    targetPositions[i] = originalPositions[i] * progress;
+                }
+                galaxy.geometry.attributes.position.needsUpdate = true;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateBigBang);
+                }
+            }
+
+            animateBigBang();
+        }
+
+        // Reset galaxy to default parameters
+        function resetGalaxy() {
+            params = {
+                starCount: 5000,
+                spiralArms: 4,
+                armTightness: 1.5,
+                armWidth: 0.5,
+                coreSize: 0.3,
+                coreDensity: 2.0,
+                diskSize: 1.0,
+                starSize: 0.5,
+                coreColor: '#ff8a4a',
+                armColor: '#8a8aff',
+                rotationSpeed: 0.2,
+                bigBangDuration: 3.0,
+                showNebulae: true,
+                starInteraction: true
+            };
+
+            gui.updateDisplay();
+            createGalaxy();
+        }
+
+        // Randomize galaxy parameters
+        function randomizeGalaxy() {
+            params.starCount = Math.floor(Math.random() * 19000) + 1000;
+            params.spiralArms = Math.floor(Math.random() * 7) + 1;
+            params.armTightness = Math.random() * 2.5 + 0.5;
+            params.armWidth = Math.random() * 0.9 + 0.1;
+            params.coreSize = Math.random() * 0.9 + 0.1;
+            params.coreDensity = Math.random() * 2.5 + 0.5;
+            params.diskSize = Math.random() * 1.5 + 0.5;
+            params.starSize = Math.random() * 1.9 + 0.1;
+            params.coreColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+            params.armColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+            params.rotationSpeed = Math.random();
+            
+            gui.updateDisplay();
+            createGalaxy();
+        }
+
+        // Take screenshot of current view
+        function takeScreenshot() {
+            const link = document.createElement('a');
+            link.download = 'galaxy-screenshot.png';
+            link.href = renderer.domElement.toDataURL('image/png');
+            link.click();
+        }
+
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (galaxy && params.rotationSpeed > 0) {
+                galaxy.rotation.y += 0.001 * params.rotationSpeed;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Initialize the app
+        init();
+    </script>
+
+              
+          
+                
+          
+              
+</body></html>
